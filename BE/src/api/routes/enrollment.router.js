@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import EnrollmentController from '../controllers/enrollment.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(EnrollmentController);
+const router = Router();
+router.post('/book', authenticate, api('book'));
+router.post('/cancel', authenticate, api('cancel'));
+router.get('/member/:memberProfileId', authenticate, api('getMyClasses'));
+router.get('/class/:classId', authenticate, authorize(['Manager', 'Coach', 'Receptionist']), api('getClassMembers'));
+export default router;

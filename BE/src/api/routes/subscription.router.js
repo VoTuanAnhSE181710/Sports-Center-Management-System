@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import SubscriptionController from '../controllers/subscription.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(SubscriptionController);
+const router = Router();
+router.post('/register', authenticate, api('register'));
+router.post('/renew', authenticate, authorize(['Manager', 'Receptionist']), api('renew'));
+router.get('/:memberProfileId/status', authenticate, api('checkStatus'));
+router.get('/:memberProfileId/history', authenticate, api('getHistory'));
+export default router;

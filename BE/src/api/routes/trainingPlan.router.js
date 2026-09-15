@@ -1,0 +1,15 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import TrainingPlanController from '../controllers/trainingPlan.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(TrainingPlanController);
+const router = Router();
+router.post('/', authenticate, authorize(['Coach', 'Manager']), api('create'));
+router.get('/:id', authenticate, api('getById'));
+router.get('/member/:memberProfileId', authenticate, api('getByMember'));
+router.get('/coach/:coachProfileId', authenticate, api('getByCoach'));
+router.put('/:id', authenticate, authorize(['Coach']), api('update'));
+router.post('/:id/exercises', authenticate, authorize(['Coach']), api('addExercise'));
+router.delete('/:id/exercises/:exerciseId', authenticate, authorize(['Coach']), api('removeExercise'));
+router.post('/:id/results', authenticate, authorize(['Coach']), api('addResult'));
+export default router;

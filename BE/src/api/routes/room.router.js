@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import RoomController from '../controllers/room.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(RoomController);
+const router = Router();
+router.get('/', api('getAll'));
+router.get('/:id', api('getById'));
+router.post('/', authenticate, authorize(['Manager']), api('create'));
+router.put('/:id', authenticate, authorize(['Manager']), api('update'));
+router.delete('/:id', authenticate, authorize(['Manager']), api('delete'));
+export default router;

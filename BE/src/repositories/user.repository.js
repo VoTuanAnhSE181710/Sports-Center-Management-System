@@ -1,452 +1,88 @@
-import { LOCK_TIME, MAX_LOGIN_ATTEMPTS } from '../constants/constants.js';
-import User from '../models/user.js'
+import prisma from '../config/db.js';
+import { MAX_LOGIN_ATTEMPTS, LOCK_TIME } from '../constants/constants.js';
 
 class UserRepository {
-    findUserByPhone = async({ phone }) => {
-        const existingUser = await User.findOne({ phone })
-                                        .populate('roleId')
-                                        .lean();
-        if (!existingUser) {
-            return null;
-        }
-        
-        return {
-            ...existingUser,
-            userId: existingUser._id.toString(),
-        }
+  findUserByEmail = async ({ email }) => {
+    return prisma.user.findUnique({ where: { email }, include: { role: true } });
+  }
+
+  findUserByPhone = async ({ phone }) => {
+    return prisma.user.findUnique({ where: { phone }, include: { role: true } });
+  }
+
+  findUserById = async ({ userId }) => {
+    return prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
+  }
+
+  createUser = async ({ email, password, fullName, phone, roleId, createdBy, avatarUrl, avatarPublicId }) => {
+    return prisma.user.create({
+      data: { email, password, fullName, phone, roleId, createdBy, avatarUrl, avatarPublicId, status: 'ACTIVE' },
+      include: { role: true },
+    });
+  }
+
+  updateUserData = async ({ userId, userData }) => {
+    return prisma.user.update({ where: { id: userId }, data: userData, include: { role: true } });
+  }
+
+  updateUserStatus = async ({ userId, status }) => {
+    return prisma.user.update({ where: { id: userId }, data: { status }, include: { role: true } });
+  }
+
+  incrementLoginAttempts = async ({ userId }) => {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const newAttempts = user.loginAttempts + 1;
+    const data = newAttempts >= MAX_LOGIN_ATTEMPTS
+      ? { loginAttempts: newAttempts, status: 'LOCKED', lockUntil: new Date(Date.now() + LOCK_TIME) }
+      : { loginAttempts: newAttempts };
+    return prisma.user.update({ where: { id: userId }, data, include: { role: true } });
+  }
+
+  resetLoginAttempts = async ({ userId }) => {
+    return prisma.user.update({ where: { id: userId }, data: { loginAttempts: 0, lockUntil: null }, include: { role: true } });
+  }
+
+  checkAndUnlockAccount = async ({ userId }) => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
+    if (user.status === 'LOCKED' && user.lockUntil && user.lockUntil < new Date()) {
+      return prisma.user.update({ where: { id: userId }, data: { status: 'ACTIVE', loginAttempts: 0, lockUntil: null }, include: { role: true } });
     }
-    findUserByEmail = async({ email }) => {
-        const existingUser = await User.findOne({ email })
-                                        .populate('roleId')
-                                        .lean();
-        if (!existingUser) {
-            return null;
-        }
-        
-        return {
-            ...existingUser,
-            userId: existingUser._id.toString(),
-        }
-    }
+    return user;
+  }
 
-    findByUsername = async({ username }) => {
-        const existingUser = await User.findOne({ username })
-                                        .populate('roleId')
-                                        .lean();
-        if (!existingUser) {
-            return null;
-        }
-        
-        return {
-            ...existingUser,
-            userId: existingUser._id.toString(),
-        }
-    }
+  changePassword = async ({ userId, password }) => {
+    return prisma.user.update({ where: { id: userId }, data: { password, loginAttempts: 0, lockUntil: null }, include: { role: true } });
+  }
 
-    findUserById = async ({ userId }) => {
-        const exitstingUser = await User.findById(userId)
-                                        .populate('roleId')
-                                        .lean();
-        if (!exitstingUser) {
-            return null;
-        }
+  changeUserRole = async ({ userId, roleId }) => {
+    return prisma.user.update({ where: { id: userId }, data: { roleId }, include: { role: true } });
+  }
 
-        return {
-            ...exitstingUser,
-            userId: exitstingUser._id.toString(),
-        }
-    }
+  softDeleteUser = async ({ userId, deletedBy }) => {
+    return prisma.user.update({ where: { id: userId }, data: { status: 'INACTIVE', deletedAt: new Date(), deletedBy }, include: { role: true } });
+  }
 
-    findUsersByEnrolledCourse = async (courseId) => {
-        return User.find({ enrolled: courseId }).select('_id').lean();
-    }
+  getAllUsers = async ({ page = 1, limit = 10, roleId, status }) => {
+    const skip = (page - 1) * limit;
+    const where = {};
+    if (status) where.status = status;
+    if (roleId) where.roleId = roleId;
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({ where, skip, take: limit, include: { role: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.user.count({ where }),
+    ]);
+    return { users, pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalItems: total, itemsPerPage: limit } };
+  }
 
-    createUser = async ({
-        username,
-        email,
-        password,
-        phone,
-        address,
-        fullName,
-        gender,
-        dateOfBirth,
-        roleId,
-        createdBy,
-    }) => {
-        const newUser = await User.create({
-            username,
-            email,
-            password,
-            phone,
-            address,
-            fullName,
-            gender,
-            dateOfBirth,
-            roleId,
-            createdBy,
-            status: "ACTIVE",
-        });
-
-        return newUser.toObject();
-    }
-
-    incrementLoginAttempts = async ({ userId }) => {
-        const user = await User.findById(userId)
-                                .populate('roleId')
-                                .lean();
-
-        const newAttempts = user.loginAttempts + 1;
-
-        let updatedUser;
-        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-            updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: {
-                        loginAttempts: newAttempts,
-                        status: "LOCKED",
-                        lockUntil: new Date(Date.now() + LOCK_TIME)
-                    }
-                },
-                { returnDocument: 'after' }
-            ).populate('roleId').lean()
-        } else {
-            updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $inc: {
-                        loginAttempts: 1
-                    }
-                }, { returnDocument: 'after' }
-            ).populate('roleId').lean()
-        }
-
-        return {
-            ...updatedUser,
-            userId: updatedUser._id.toString(),
-        }
-    }
-
-    resetLoginAttempts = async ({ userId }) => {
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            {
-                $set: {
-                    loginAttempts: 0,
-                    lockUntil: null, 
-                }
-            },
-            { returnDocument: 'after' }
-        ).populate('roleId').lean();
-
-        return {
-            ...updatedUser,
-            userId: updatedUser._id.toString(),
-        }
-    }
-
-    checkAndUnlockAccount = async ({ userId }) => {
-        const user = await User.findById(userId).populate('roleId').lean()
-
-        if (user.status === 'LOCKED' 
-            && user.lockUntil 
-            && user.lockUntil < Date.now()) {
-            const unlockedUser =  await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: {
-                        status: 'ACTIVE',
-                        loginAttempts: 0,
-                        lockUntil: null,
-                    }
-                },
-                { returnDocument: 'after' }
-            ).populate('roleId').lean()
-
-            return {
-                ...unlockedUser,
-                userId: unlockedUser._id.toString(),
-            }
-        }
-
-        return {
-            ...user,
-            userId: user._id.toString(),
-        };
-    }
-
-    updateUserData = async ({ userId, userData }) => {
-        try {
-            const updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: userData,
-                },
-                {
-                    new: true,
-                    context: 'query',
-                }
-            ).populate('roleId').lean()
-
-            return {
-                ...updatedUser,
-                password: undefined,
-                userId: updatedUser._id.toString(),
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
-    updateUserAvatar = async ({ userId, avatar }) => {
-        try {
-            const updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: { avatar }
-                },
-                {
-                    returnDocument: 'after',
-                    context: "query"
-                }
-            ).populate('roleId').lean()
-
-            return {
-                ...updatedUser,
-                password: undefined,
-                userId: updatedUser._id.toString(),
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    }
-    updateUserStatus = async ({ userId, status }) => {
-        try {
-            const updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: { status }
-                },
-                {
-                    returnDocument: 'after',
-                    context: "query"
-                }
-            ).populate('roleId').lean()
-
-            return {
-                ...updatedUser,
-                password: undefined,
-                userId: updatedUser._id.toString(),
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    getAllUsers = async ({
-        page,
-        limit,
-        roleId,
-        status,
-    }) => {
-        const skip = (page - 1) * limit;
-
-        const filter = {};
-
-        if (status) filter.status = status;
-        if (roleId) filter.roleId = roleId;
-
-        const [users, total] = await Promise.all([
-            User.find(filter)
-                .populate('roleId')
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            User.countDocuments(filter)
-        ]);
-
-        return {
-            users: users.map(user => ({
-                ...user,
-                password: undefined,
-                userId: user._id.toString(),
-            })),
-            pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(total / limit),
-                totalItems: total,
-                itemsPerPage: limit,
-            }
-        }
-    }
-
-    softDeleteUser = async ({ userId, deletedBy }) => {
-        try {
-            const deletedUser = await User.findByIdAndUpdate(
-                
-                userId,
-                {
-                    $set: { status: "INACTIVE",
-                            deletedAt: new Date(),
-                            deletedBy: deletedBy
-                     },
-                },
-                {
-                    returnDocument: 'after',
-                    context: "query"
-                }
-            ).populate('roleId').lean()
-
-            if(!deletedUser){
-                throw new Error("User not found");
-            }
-
-            return {
-                ...deletedUser,
-                userId: deletedUser._id.toString(),
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    changePassword = async ({ userId, password }) => {
-        try {
-            const updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: {
-                        password: password,
-                        loginAttempts: 0,
-                        lockUntil: null
-                    }
-                },
-                {
-                    returnDocument: 'after',
-                    context: "query"
-                }
-            ).populate('roleId').lean()
-
-            return {
-                ...updatedUser,
-                password: undefined,
-                userId: updatedUser._id.toString(),
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    changeUserRole = async ({ userId, roleId }) => {
-        try {
-            const updatedUser = await User.findByIdAndUpdate(
-                userId,
-                {
-                    $set: { roleId: roleId }
-                },
-                {
-                    returnDocument: 'after',
-                    context: "query"
-                }
-            ).populate('roleId').lean()
-
-            if (!updatedUser) {
-                return null;
-            }
-
-            return {
-                ...updatedUser,
-                userId: updatedUser._id.toString(),
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    getStatistics = async () => {
-        const [totalUsers, activeUsers, inactiveUsers, lockedUsers, usersByRole, usersByStatus] = await Promise.all([
-            User.countDocuments(),
-            User.countDocuments({ status: 'ACTIVE' }),
-            User.countDocuments({ status: 'INACTIVE' }),
-            User.countDocuments({ lockUntil: { $gt: new Date() } }),
-            User.aggregate([
-                {
-                    $group: {
-                        _id: '$roleId',
-                        count: { $sum: 1 }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: 'roles',
-                        localField: '_id',
-                        foreignField: '_id',
-                        as: 'roleInfo'
-                    }
-                },
-                { $unwind: '$roleInfo' },
-                {
-                    $project: {
-                        roleName: '$roleInfo.roleName',
-                        count: 1,
-                        _id: 0
-                    }
-                },
-                { $sort: { count: -1 } }
-            ]),
-            User.aggregate([
-                {
-                    $group: {
-                        _id: '$status',
-                        count: { $sum: 1 }
-                    }
-                },
-                {
-                    $project: {
-                        status: '$_id',
-                        count: 1,
-                        _id: 0
-                    }
-                }
-            ])
-        ]);
-
-        return {
-            totalUsers,
-            activeUsers,
-            inactiveUsers,
-            lockedUsers,
-            usersByRole,
-            usersByStatus
-        };
-    }
-
-    /**
-     * Enroll a user in a course
-     * @param {string} userId - User ObjectId
-     * @param {string} courseId - Course ObjectId
-     */
-    enrollCourse = async ({ userId, courseId }) => {
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            {
-                $addToSet: { enrolled: courseId }
-            },
-            {
-                returnDocument: 'after',
-                context: "query"
-            }
-        ).populate('roleId').lean();
-
-        if (!updatedUser) {
-            return null;
-        }
-
-        return {
-            ...updatedUser,
-            userId: updatedUser._id.toString(),
-        };
-    }
+  getStatistics = async () => {
+    const [total, active, inactive, locked] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { status: 'ACTIVE' } }),
+      prisma.user.count({ where: { status: 'INACTIVE' } }),
+      prisma.user.count({ where: { status: 'LOCKED' } }),
+    ]);
+    return { totalUsers: total, activeUsers: active, inactiveUsers: inactive, lockedUsers: locked };
+  }
 }
 
 export default UserRepository;

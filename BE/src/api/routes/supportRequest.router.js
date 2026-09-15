@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import SupportRequestController from '../controllers/supportRequest.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(SupportRequestController);
+const router = Router();
+router.post('/', authenticate, api('create'));
+router.get('/', authenticate, authorize(['Manager', 'Receptionist']), api('getAll'));
+router.get('/:id', authenticate, api('getById'));
+router.patch('/:id/status', authenticate, authorize(['Manager', 'Receptionist']), api('updateStatus'));
+export default router;

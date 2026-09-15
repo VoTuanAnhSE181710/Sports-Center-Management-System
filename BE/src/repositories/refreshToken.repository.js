@@ -1,157 +1,22 @@
-import { configDotenv } from "dotenv";
-configDotenv()
-
-const REFRESH_TOKEN_EXPIRED_SECONDS = 7 * 24 * 60 * 60
+import prisma from '../config/db.js';
 
 class RefreshTokenRepository {
-    #redis;
+  save = async ({ userId, token, deviceId, deviceName, expiresAt }) =>
+    prisma.refreshToken.create({ data: { userId, token, deviceId, deviceName, expiresAt } });
 
-    constructor({ redis }){
-        this.#redis = redis;
-    }
-    saveMultiRefreshToken = async ({
-        userId,
-        refreshToken,
-        deviceId,
-        deviceName,
-        expiresIn = REFRESH_TOKEN_EXPIRED_SECONDS,
-    }) => {
-        try {
-            const key = `refresh_token:${userId}:${deviceId}`;
+  findByToken = async ({ token }) => prisma.refreshToken.findUnique({ where: { token } });
 
-            const devicesKey = `user_devices:${userId}`;
+  findByUserAndDevice = async ({ userId, deviceId }) =>
+    prisma.refreshToken.findFirst({ where: { userId, deviceId } });
 
-            const deviceInfoKey = `devices_info:${userId}:${deviceId}`;
+  revokeByDevice = async ({ userId, deviceId }) =>
+    prisma.refreshToken.deleteMany({ where: { userId, deviceId } });
 
-            await Promise.all([
-                this.#redis.setex(key, expiresIn, refreshToken),
+  revokeAll = async ({ userId }) => prisma.refreshToken.deleteMany({ where: { userId } });
 
-                this.#redis.sadd(devicesKey, deviceId),
-
-                this.#redis.hset(deviceInfoKey, {
-                    name: deviceName,
-                    lastActive: new Date().toLocaleString('vi-VN'),
-                }),
-
-                this.#redis.expire(devicesKey, expiresIn),
-                this.#redis.expire(deviceInfoKey, expiresIn),
-            ]);
-            return true;
-        } catch (error) {
-            console.log(`Cannot save refreshToken to redis: ${error}`);
-            throw error;
-        }
-    }
-
-    findRefreshToken = async ({ 
-        refreshToken, 
-        userId,
-        deviceId
-    }) => {
-        const key = `refresh_token:${userId}:${deviceId}`;
-
-        try {
-            const storedRefreshToken = await this.#redis.get(key);
-
-            if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
-                return null;
-            }
-
-            return { refreshToken: storedRefreshToken };
-        } catch (error) {
-            console.log(error);
-            throw error
-        }
-    }
-
-    deleteRefreshToken = async ({
-        userId,
-        deviceId,
-    }) => {
-        const key = `refresh_token:${userId}:${deviceId}`
-
-        const devicesKey = `user_devices:${userId}`
-        
-        const deviceInfoKey = `devices_info:${userId}:${deviceId}`
-        try {
-            const deletedCount = await this.#redis.del(key);
-            
-            if (deletedCount > 0) {
-                await Promise.all([
-                    this.#redis.srem(devicesKey, deviceId),
-                    this.#redis.del(deviceInfoKey)
-                ]);
-            }
-
-            return deletedCount;
-        } catch (error) {
-            console.log(`cannot delete refresh token in redis: ${error}`);
-            throw error;
-        }
-    }
-
-
-    //for reset pass hoac change pass
-    deleteAllRefreshToken = async ({ userId }) => {
-        const devicesKey = `user_devices:${userId}`
-
-        try {
-            const devices = await this.#redis.smembers(devicesKey)
-
-            if (devices && devices.length > 0) {
-                const deletePromises = devices.map(deviceId => 
-                    Promise.all([
-                        this.#redis.del(`refresh_token:${userId}:${deviceId}`),
-                        this.#redis.del(`devices_info:${userId}:${deviceId}`),
-                    ])
-                );
-                await Promise.all(deletePromises)
-            }
-
-            await this.#redis.del(devicesKey)
-            
-            return devices.length;
-        } catch (error) {
-            console.log(`cannot delete all refresh tokens in redis: ${error}`);
-            throw error;
-        }
-    }
-
-    //de admin quan ly user
-    getActiveDevices = async ({ userId }) => {
-
-    }
-
-    verifyDeviceId = async ({
-        userId,
-        deviceId,
-    }) => {
-        
-        const key = `refresh_token:${userId}:${deviceId}`;
-
-        try {
-            const exists = await this.#redis.exists(key);
-            return exists;
-        } catch (error) {
-            console.log(`Cannot verify deviceId in redis server: ${error}`);
-            throw error;
-        }
-    }
-
-    verifyOwner = async ({
-        userId,
-        deviceId,
-    }) => {
-        try {
-            const devicesKey = `user_devices:${userId}`
-    
-            const isOwner = await this.#redis.sismember(devicesKey, deviceId)
-            return isOwner;
-        } catch (error) {
-            console.log(`Cannot verify owner from redis: ${error}`);
-            throw error
-        }
-    }
+  verifyOwner = async ({ userId, deviceId }) => {
+    const token = await prisma.refreshToken.findFirst({ where: { userId, deviceId } });
+    return token ? 1 : 0;
+  }
 }
-
 export default RefreshTokenRepository;

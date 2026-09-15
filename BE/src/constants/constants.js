@@ -1,51 +1,53 @@
-export const ACTIONS = {
-    REGISTER: 'REGISTER',
-    LOGIN: 'LOGIN',
-    UPDATE: 'UPDATE',
-    DELETE: 'DELETE',
-    CREATE: 'CREATE',
-    GET: 'GET',
-    RECEIVE_INVENTORY: 'RECEIVE_INVENTORY',
-    VIEW_INVENTORY: 'VIEW_INVENTORY',
-    DISPATCH_INVENTORY: 'DISPATCH_INVENTORY',
-}
+export const MAX_LOGIN_ATTEMPTS = 5;
+export const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
 
-export const TARGET_TYPES = {
-    USER: "USER",
-    WAREHOUSE: "WAREHOUSE",
-    ROLE: "ROLE",
-    PERMISSION: "PERMISSION",
-    INVENTORY: "INVENTORY",
-}
-
-export const OUTCOMES = {
-    SUCCESS: "SUCCESS",
-    FAILED: "FAILED",
-}
+export const ROLES = {
+  MANAGER: 'Manager',
+  COACH: 'Coach',
+  MEMBER: 'Member',
+  RECEPTIONIST: 'Receptionist',
+};
 
 export const LOGIN_STATUS = {
-    LOCKED: 'LOCKED',
-    ACTIVE: 'ACTIVE',
-    INACTIVE: 'INACTIVE',
-}
-
-export const NOTIFICATION_TYPE = {
-    ASSIGNMENT: "ASSIGNMENT",
-}
-
-export const NOTIFICATION_TARGET_ROLE = {
-    STAFF: "STAFF",
-}
-
-export const MAX_LOGIN_ATTEMPTS = 5;
-
-export const LOCK_TIME = 15 * 60 * 1000;
-
-export default {
-    ACTIONS,
-    TARGET_TYPES,
-    OUTCOMES,
-    LOGIN_STATUS,
-    MAX_LOGIN_ATTEMPTS,
-    LOCK_TIME
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  LOCKED: 'LOCKED',
 };
+
+export const ACTIONS = {
+  LOGIN: 'LOGIN',
+  LOGOUT: 'LOGOUT',
+  REGISTER: 'REGISTER',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+  CREATE: 'CREATE',
+  VIEW: 'VIEW',
+};
+
+export const TARGET_TYPES = {
+  USER: 'USER',
+  MEMBER: 'MEMBER',
+  COACH: 'COACH',
+  CLASS: 'CLASS',
+  SCHEDULE: 'SCHEDULE',
+  ENROLLMENT: 'ENROLLMENT',
+  MEMBERSHIP: 'MEMBERSHIP',
+  PAYMENT: 'PAYMENT',
+};
+
+export const OUTCOMES = {
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+};
+
+const constants = {
+  MAX_LOGIN_ATTEMPTS,
+  LOCK_TIME,
+  ROLES,
+  LOGIN_STATUS,
+  ACTIONS,
+  TARGET_TYPES,
+  OUTCOMES,
+};
+
+export default constants;

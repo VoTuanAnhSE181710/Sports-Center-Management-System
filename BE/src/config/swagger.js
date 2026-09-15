@@ -5,22 +5,18 @@ const options = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'Yarn Shop API',
+            title: 'Sports Center Management System API',
             version: '1.0.0',
-            description: 'API documentation for Yarn Shop System',
+            description: 'API documentation for Sports Center Management System',
             contact: {
                 name: 'API Support',
-                email: 'support@yarnshop.com'
+                email: 'support@sportscenter.com'
             }
         },
         servers: [
             {
                 url: 'http://localhost:5000/api/v1',
                 description: 'Development server'
-            },
-            {
-                url: 'https://yarn-shop-be.onrender.com/api/v1',
-                description: 'Production server (Render)'
             }
         ],
         tags: [

@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import MemberController from '../controllers/member.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(MemberController);
+const router = Router();
+router.get('/me', authenticate, api('getMyProfile'));
+router.get('/', authenticate, authorize(['Manager', 'Receptionist', 'Coach']), api('getAll'));
+router.get('/:id', authenticate, api('getById'));
+router.post('/', authenticate, authorize(['Manager', 'Receptionist']), api('create'));
+router.put('/:id', authenticate, api('update'));
+export default router;

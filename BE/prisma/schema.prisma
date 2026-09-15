@@ -1,0 +1,478 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum ClassStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  VNPAY
+  MOMO
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum TrainingLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum NotificationType {
+  SYSTEM
+  CLASS
+  PAYMENT
+  TRAINING
+  GENERAL
+}
+
+enum SupportRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ==================== AUTH & USERS ====================
+
+model Role {
+  id          String   @id @default(cuid())
+  roleName    String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users           User[]
+  rolePermissions RolePermission[]
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  resource    String
+  action      String
+  createdAt   DateTime @default(now())
+  rolePermissions RolePermission[]
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  password       String?
+  fullName       String
+  phone          String?    @unique
+  avatarUrl      String?
+  avatarPublicId String?
+  status         UserStatus @default(ACTIVE)
+  loginAttempts  Int        @default(0)
+  lockUntil      DateTime?
+  roleId         String
+  createdBy      String?
+  deletedAt      DateTime?
+  deletedBy      String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  role          Role           @relation(fields: [roleId], references: [id])
+  refreshTokens RefreshToken[]
+  memberProfile MemberProfile?
+  coachProfile  CoachProfile?
+  auditLogs     AuditLog[]     @relation("AuditLogActor")
+  notifications Notification[]
+  createdUsers  User[]         @relation("UserCreatedBy")
+  creator       User?          @relation("UserCreatedBy", fields: [createdBy], references: [id])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  deviceId   String
+  deviceName String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("refresh_tokens")
+}
+
+// ==================== PROFILES ====================
+
+model MemberProfile {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  dateOfBirth   DateTime?
+  gender        Gender?
+  address       String?
+  fitnessGoal   String?
+  trainingLevel TrainingLevel @default(BEGINNER)
+  healthNote    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions   MembershipSubscription[]
+  enrollments     Enrollment[]
+  attendances     Attendance[]
+  trainingPlans   TrainingPlan[]
+  supportRequests SupportRequest[]
+  @@map("member_profiles")
+}
+
+model CoachProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  specialization String?
+  experience     Int?
+  bio            String?
+  rating         Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classes         Class[]
+  trainingPlans   TrainingPlan[]
+  trainingResults TrainingResult[]
+  @@map("coach_profiles")
+}
+
+// ==================== MEMBERSHIP ====================
+
+model MembershipPlan {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  durationDays Int
+  price        Float
+  maxClasses   Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  subscriptions MembershipSubscription[]
+  @@map("membership_plans")
+}
+
+model MembershipSubscription {
+  id               String           @id @default(cuid())
+  memberProfileId  String
+  membershipPlanId String
+  startDate        DateTime
+  endDate          DateTime
+  status           MembershipStatus @default(ACTIVE)
+  classesRemaining Int?
+  createdBy        String?
+  renewedFrom      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  memberProfile  MemberProfile  @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  membershipPlan MembershipPlan @relation(fields: [membershipPlanId], references: [id])
+  payments       Payment[]
+  @@map("membership_subscriptions")
+}
+
+// ==================== SPORTS & ROOMS ====================
+
+model Sport {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  iconUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  classes Class[]
+  @@map("sports")
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  capacity    Int
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  classSchedules ClassSchedule[]
+  @@map("rooms")
+}
+
+// ==================== CLASSES & SCHEDULES ====================
+
+model Class {
+  id             String      @id @default(cuid())
+  name           String
+  description    String?
+  sportId        String
+  coachProfileId String?
+  maxCapacity    Int
+  status         ClassStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  sport          Sport          @relation(fields: [sportId], references: [id])
+  coachProfile   CoachProfile?  @relation(fields: [coachProfileId], references: [id])
+  classSchedules ClassSchedule[]
+  enrollments    Enrollment[]
+  @@map("classes")
+}
+
+model ClassSchedule {
+  id        String    @id @default(cuid())
+  classId   String
+  roomId    String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  room        Room         @relation(fields: [roomId], references: [id])
+  attendances Attendance[]
+  @@map("class_schedules")
+}
+
+model Enrollment {
+  id              String           @id @default(cuid())
+  memberProfileId String
+  classId         String
+  status          EnrollmentStatus @default(ENROLLED)
+  enrolledAt      DateTime         @default(now())
+  cancelledAt     DateTime?
+  createdBy       String?
+  memberProfile MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  class         Class         @relation(fields: [classId], references: [id])
+  @@unique([memberProfileId, classId])
+  @@map("enrollments")
+}
+
+// ==================== ATTENDANCE ====================
+
+model Attendance {
+  id              String   @id @default(cuid())
+  memberProfileId String
+  classScheduleId String
+  checkedInAt     DateTime @default(now())
+  note            String?
+  memberProfile MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  classSchedule ClassSchedule @relation(fields: [classScheduleId], references: [id])
+  @@unique([memberProfileId, classScheduleId])
+  @@map("attendances")
+}
+
+// ==================== PAYMENT & INVOICE ====================
+
+model Payment {
+  id                       String        @id @default(cuid())
+  membershipSubscriptionId String?
+  amount                   Float
+  method                   PaymentMethod
+  status                   PaymentStatus @default(PENDING)
+  note                     String?
+  transactionId            String?
+  createdBy                String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  membershipSubscription MembershipSubscription? @relation(fields: [membershipSubscriptionId], references: [id])
+  invoice                Invoice?
+  @@map("payments")
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  paymentId String   @unique
+  invoiceNo String   @unique
+  issuedAt  DateTime @default(now())
+  note      String?
+  payment Payment @relation(fields: [paymentId], references: [id])
+  @@map("invoices")
+}
+
+// ==================== TRAINING ====================
+
+model TrainingPlan {
+  id              String    @id @default(cuid())
+  memberProfileId String
+  coachProfileId  String
+  title           String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  memberProfile   MemberProfile      @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  coachProfile    CoachProfile       @relation(fields: [coachProfileId], references: [id])
+  exercises       TrainingExercise[]
+  trainingResults TrainingResult[]
+  @@map("training_plans")
+}
+
+model TrainingExercise {
+  id             String @id @default(cuid())
+  trainingPlanId String
+  name           String
+  sets           Int?
+  reps           Int?
+  duration       Int?
+  note           String?
+  orderIndex     Int    @default(0)
+  trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  @@map("training_exercises")
+}
+
+model TrainingResult {
+  id             String   @id @default(cuid())
+  trainingPlanId String
+  coachProfileId String
+  sessionDate    DateTime
+  performance    String?
+  coachComment   String?
+  rating         Int?
+  createdAt      DateTime @default(now())
+  trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  coachProfile CoachProfile @relation(fields: [coachProfileId], references: [id])
+  @@map("training_results")
+}
+
+// ==================== NOTIFICATION ====================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      NotificationType @default(GENERAL)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("notifications")
+}
+
+// ==================== SUPPORT ====================
+
+model SupportRequest {
+  id              String               @id @default(cuid())
+  memberProfileId String
+  subject         String
+  message         String
+  status          SupportRequestStatus @default(OPEN)
+  resolvedNote    String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  memberProfile MemberProfile @relation(fields: [memberProfileId], references: [id], onDelete: Cascade)
+  @@map("support_requests")
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  outcome    String
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id])
+  @@map("audit_logs")
+}
+
+// ==================== AI ====================
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages        AIMessage[]
+  recommendations AIRecommendation[]
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  createdAt      DateTime @default(now())
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  @@map("ai_messages")
+}
+
+model AIRecommendation {
+  id             String   @id @default(cuid())
+  conversationId String
+  memberId       String
+  coachId        String?
+  content        Json
+  isApproved     Boolean  @default(false)
+  isAssigned     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  @@map("ai_recommendations")
+}

@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import ClassController from '../controllers/class.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(ClassController);
+const router = Router();
+router.get('/', api('getAll'));
+router.get('/:id', api('getById'));
+router.post('/', authenticate, authorize(['Manager']), api('create'));
+router.put('/:id', authenticate, authorize(['Manager']), api('update'));
+router.patch('/:id/assign-coach', authenticate, authorize(['Manager']), api('assignCoach'));
+export default router;

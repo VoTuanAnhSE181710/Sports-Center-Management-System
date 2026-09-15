@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { makeInvoker } from 'awilix-express';
+import AttendanceController from '../controllers/attendance.controller.js';
+import { authenticate, authorize } from '../middlewares/middleware.js';
+const api = makeInvoker(AttendanceController);
+const router = Router();
+router.post('/checkin', authenticate, authorize(['Receptionist', 'Coach', 'Manager']), api('checkIn'));
+router.get('/member/:memberProfileId', authenticate, api('getHistory'));
+router.get('/schedule/:classScheduleId', authenticate, authorize(['Coach', 'Manager']), api('getBySchedule'));
+export default router;
