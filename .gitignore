@@ -20,6 +20,3 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
-
-# FE is managed independently by FE team
-FE/
